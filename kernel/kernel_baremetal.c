@@ -1,31 +1,32 @@
-// kernel/kernel_baremetal.c - Versão pra rodar no Pico
-#define UART0_BASE 0x40034000
-#define UART0_DR (*(volatile unsigned int*)(UART0_BASE + 0x00))
-#define UART0_FR (*(volatile unsigned int*)(UART0_BASE + 0x18))
+void putc(char c);
+void delay(void);
 
-void uart_putc(char c) {
-    while (UART0_FR & (1 << 5)); // Espera TX vazio
-    UART0_DR = c;
+void print(const char *s) {
+    while (*s) putc(*s++);
 }
 
-void uart_puts(const char* s) {
-    while (*s) uart_putc(*s++);
-}
+void main(void) {
+    volatile unsigned int *SIO = (unsigned int *)0xD0000000;
+    volatile unsigned int *RESETS = (unsigned int *)0x4000C000;
+    volatile unsigned int *IO_BANK0 = (unsigned int *)0x40014000;
 
-void kernel_main(void) {
-    // Configuração mínima da UART0
-    *(volatile unsigned int*)0x40034024 = 833; // Baud 115200
-    *(volatile unsigned int*)0x4003402C = 0x70;
+    RESETS[4] &= ~(1 << 5);
+    while ((RESETS[2] & (1 << 5)) == 0);
 
-    uart_puts("\n\r=== ARVORE OS BOOT REAL ===\n\r");
-    uart_puts("Adalina no controle do Raspberry Pi Pico!\n\r");
-    uart_puts("Bootloader funcionou!\n\r");
+    IO_BANK0[32] = 5;
+    SIO[9] = (1 << 25);
 
-    while(1) {
-        // Pisca LED onboard
-        *(volatile unsigned int*)0x40014014 = 1 << 25; // GPIO25 ON
-        for(volatile int i=0; i<1000000; i++);
-        *(volatile unsigned int*)0x40014018 = 1 << 25; // GPIO25 OFF
-        for(volatile int i=0; i<1000000; i++);
+    print("\n=== ARVORE OS BOOT REAL ===\n");
+    print("Adalina no controle do Raspberry Pi Pico!\n");
+    print("Bootloader funcionou!\n\n");
+
+    while (1) {
+        SIO[6] = (1 << 25);
+        print("LED ON\n");
+        for (int i = 0; i < 500000; i++) delay();
+
+        SIO[7] = (1 << 25);
+        print("LED OFF\n");
+        for (int i = 0; i < 500000; i++) delay();
     }
 }
